@@ -1,0 +1,17 @@
+{
+    "name": "egroupware/aitools",
+    "description": "AI Tools for EGroupware.",
+    "type": "egroupware-app",
+    "authors": [
+        {
+            "name": "amir",
+            "email": "amir@egroupware.org"
+        }
+        {
+            "name": "ralf",
+            "email": "rb@egroupware.org"
+        }
+    ],
+    "require": {
+    }
+}
