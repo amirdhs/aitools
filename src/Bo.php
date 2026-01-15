@@ -117,6 +117,7 @@ class Bo
 			'api_key' => trim($config['ai_api_key'] ?? ''),
 			'model'   => $model,
 			'provider' => $provider,
+			'max_tokens' => $config['ai_max_tokens'] ?? null,
 		];
 	}
 	
@@ -245,7 +246,7 @@ class Bo
 			'model' => $config['model'],
 			'messages' => $messages,
 			'temperature' => 0.7,
-			'max_tokens' => 1000
+			'max_tokens' => (int)($config['max_tokens'] ?? 10000),
 		];
 		
 		$headers = [
