@@ -20,6 +20,8 @@ class Bo
 {
 	const APP = 'aitools';
 
+	const PRESERVE_MARKUP = "\n- If the content contains HTML or markup you should use it in the response.  ";
+
 	/**
 	 * Constructor
 	 */
@@ -78,31 +80,29 @@ class Bo
 	protected function get_predefined_prompts()
 	{
 		return [
-			'aiassist.summarize' => 'Please summarize the following text concisely while preserving the key information and main points. Return only the summary without any additional commentary.',
-			'aiassist.formal' => 'Please rewrite the following text to make it more professional and formal while maintaining the original meaning. Return only the revised text.',
-			'aiassist.casual' => 'Please rewrite the following text to make it more casual and friendly while maintaining the original meaning. Return only the revised text.',
-			'aiassist.grammar' => 'Please correct any grammar, spelling, and punctuation errors in the following text while preserving the original meaning and tone. Return only the corrected text.',
-			'aiassist.concise' => 'Please make the following text more concise and to-the-point while preserving all important information. Return only the condensed text.',
-			'aiassist.generate_reply' => 'Based on the following text, generate a professional email reply. Return only the reply content.',
-			'aiassist.meeting_followup' => 'Based on the following content, create a professional meeting follow-up message. Return only the follow-up content.',
-			'aiassist.thank_you' => 'Based on the following context, create a professional thank you note. Return only the thank you message.',
-			'aiassist.translate-en' => 'Please translate the following text to English. Return only the translated text.',
-			'aiassist.translate-de' => 'Please translate the following text to German. Return only the translated text.',
-			'aiassist.translate-fr' => 'Please translate the following text to French. Return only the translated text.',
-			'aiassist.translate-es' => 'Please translate the following text to Spanish. Return only the translated text.',
-			'aiassist.translate-it' => 'Please translate the following text to Italian. Return only the translated text.',
-			'aiassist.translate-pt' => 'Please translate the following text to Portuguese. Return only the translated text.',
-			'aiassist.translate-nl' => 'Please translate the following text to Dutch. Return only the translated text.',
-			'aiassist.translate-ru' => 'Please translate the following text to Russian. Return only the translated text.',
-			'aiassist.translate-zh' => 'Please translate the following text to Chinese. Return only the translated text.',
-			'aiassist.translate-ja' => 'Please translate the following text to Japanese. Return only the translated text.',
-			'aiassist.translate-ko' => 'Please translate the following text to Korean. Return only the translated text.',
-			'aiassist.translate-ar' => 'Please translate the following text to Arabic. Return only the translated text.',
-			'aiassist.translate-fa' => 'Please translate the following text to Persian (Farsi). Return only the translated text.',
-			'aiassist.generate_subject' => 'Based on the following email content, generate a clear and concise subject line that accurately summarizes the main topic or purpose. Return only the subject line without quotes or additional text.',
-		];
+				'aiassist.summarize'        => 'Please summarize the following text concisely while preserving the key information and main points. Return only the summary without any additional commentary.' . self::PRESERVE_MARKUP,
+				'aiassist.formal'           => 'Please rewrite the following text to make it more professional and formal while maintaining the original meaning. Return only the revised text.',
+				'aiassist.casual'           => 'Please rewrite the following text to make it more casual and friendly while maintaining the original meaning. Return only the revised text.',
+				'aiassist.grammar'          => 'Please correct any grammar, spelling, and punctuation errors in the following text while preserving the original meaning and tone. Return only the corrected text.',
+				'aiassist.concise'          => 'Please make the following text more concise and to-the-point while preserving all important information. Return only the condensed text.',
+				'aiassist.generate_reply'   => 'Based on the following text, generate a professional email reply. Return only the reply content.',
+				'aiassist.meeting_followup' => 'Based on the following content, create a professional meeting follow-up message. Return only the follow-up content.',
+				'aiassist.thank_you'        => 'Based on the following context, create a professional thank you note. Return only the thank you message.',
+				'aiassist.generate_subject' => 'Based on the following content, generate a clear and concise subject line that accurately summarizes the main topic or purpose. Return only the subject line without quotes or additional text.',
+			] + $this->get_translation_prompts();
 	}
-	
+
+	protected function get_translation_prompts()
+	{
+		$prompts = [];
+		$prompt = 'Please translate the following text to {$lang}. Return only the translated text.  Match the formatting of the response as closely to the original as possible.' . self::PRESERVE_MARKUP;
+		foreach(Api\Translation::get_installed_langs() as $code => $lang)
+		{
+			$prompts['aiassist.translate-' . $code] = str_replace('{$lang}', $lang, $prompt);
+		}
+		return $prompts;
+	}
+
 	/**
 	 * Get AI configuration
 	 */
@@ -299,7 +299,12 @@ class Bo
 		if (!$result || !isset($result['choices'][0]['message'])) {
 			throw new \Exception('Invalid AI API response format');
 		}
-		
+		$status = $this->openAiResponseStatus($result);
+		if(!$status['ok'])
+		{
+			throw new \Exception($this->openAiResponseStatus($result)['message']);
+		}
+
 		$ai_message = $result['choices'][0]['message'];
 		
 		return [
@@ -332,6 +337,72 @@ class Bo
 			),
 			'timestamp' => $system_time,
 			'user_timezone' => $user_tz
+		];
+	}
+
+	/**
+	 * Return a simple, user-friendly status message for an OpenAI response.
+	 *
+	 * @param array $response Decoded JSON response from OpenAI
+	 * @return array {
+	 *   ok: bool,
+	 *   message: string
+	 * }
+	 */
+	protected function openAiResponseStatus(array $response) : array
+	{
+		// API / model error
+		if(isset($response['error']))
+		{
+			return [
+				'ok'      => false,
+				'message' => 'The AI service could not process your request. Please try again later.'
+			];
+		}
+
+		// Find finish_reason
+		$finishReason = null;
+
+		if(isset($response['choices'][0]['finish_reason']))
+		{
+			$finishReason = $response['choices'][0]['finish_reason'];
+		}
+		elseif(isset($response['output'][0]['finish_reason']))
+		{
+			$finishReason = $response['output'][0]['finish_reason'];
+		}
+
+		// Success
+		if($finishReason === null || $finishReason === 'stop')
+		{
+			return [
+				'ok'      => true,
+				'message' => 'Request completed successfully.'
+			];
+		}
+
+		// User-friendly failures
+		switch($finishReason)
+		{
+			case 'length':
+				$msg = 'The response was too long to complete. Please try a shorter or more specific request.';
+				break;
+
+			case 'content_filter':
+				$msg = 'The request could not be completed due to content restrictions.';
+				break;
+
+			case 'tool_calls':
+				$msg = 'The AI could not return a final answer for this request.';
+				break;
+
+			default:
+				$msg = 'The request could not be completed. Please try again.';
+		}
+
+		return [
+			'ok'      => false,
+			'message' => $msg
 		];
 	}
 }
