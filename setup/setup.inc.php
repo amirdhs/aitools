@@ -32,6 +32,7 @@ $setup_info['aitools']['hooks']['admin'] = 'EGroupware\\AiTools\\Hooks::allHooks
 $setup_info['aitools']['hooks']['sidebox_menu'] = 'EGroupware\\AiTools\\Hooks::allHooks';
 $setup_info['aitools']['hooks']['config'] = 'EGroupware\AiTools\\Hooks::config';
 $setup_info['aitools']['hooks']['config_validate'] = 'EGroupware\AiTools\Hooks::configValidate';
+$setup_info['aitools']['hooks']['settings'] = 'EGroupware\AiTools\Hooks::preferences';
 
 /* Dependencies for this app to work */
 $setup_info['aitools']['depends'][] = array(

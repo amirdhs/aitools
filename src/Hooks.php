@@ -145,4 +145,16 @@ class Hooks
 
 		return null;
 	}
+
+	public static function preferences($data)
+	{
+		return [
+			'languages' => [
+				'name'       => 'languages',
+				'type'       => 'et2-select-lang',
+				'label'      => "Translation languages",
+				'attributes' => ['search' => true, 'multiple' => true]
+			]
+		];
+	}
 }
